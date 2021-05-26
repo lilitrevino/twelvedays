@@ -7,7 +7,7 @@ output:
     css: styles.css
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, echo=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 # Packages for Functions
@@ -15,6 +15,7 @@ library(dplyr)
 library(glue)
 library(stringr)
 library(purrr)
+library(english)
 ```
 
 
@@ -24,7 +25,7 @@ Run the code below to load up a dataset called `xmas` that contains the crucial
 information about the gifts in the song. We will use this dataset to test out
 our functions as we work on them.
 
-```{r}
+```{r, include = FALSE, echo = FALSE}
 xmas <- read.csv("https://www.dropbox.com/s/e584pryn8evm1gz/xmas.csv?dl=1")
 ```
 
@@ -39,16 +40,24 @@ on day 5 simply says "ring".
 Using the skeleton of the `pluralize_gift()` function, complete the code so that 
 the function takes a gift and returns the appropriate plural. 
 
-```{r}
+```{r, echo=FALSE}
 # Function that takes a noun and makes it plural
 # Arguments -- gift -- A string or vector of strings
 # Return -- A string or vector of strings with the pluralized words
 
 pluralize_gift <- function(gift){
-
-gift <- gift %>%
-  str_replace()
-
+  if(str_detect(gift, "oo")) {
+   gift <- gift %>%
+     str_replace("oo",replacement = "ee") 
+  }
+   else if(str_detect(gift, "y")) {
+     gift <- gift %>%
+     str_replace("y$", "ies")
+   }
+   else {   
+     gift <- gift %>%
+    str_replace("$", "s")
+   }
 return(gift)
 
 }
@@ -60,7 +69,7 @@ these types.
 
 *Hint 2:*  The following small example may be useful to you:
 
-```{r, eval = TRUE}
+```{r, eval = TRUE, echo=FALSE}
 my_names <- c("Kimberly", "Trini", "Jason", "Billy", "Zach", "Tommy")
 
 my_names %>% 
@@ -81,7 +90,7 @@ Try your function out on the gifts in the dataset.
 (Consider: is your function *vectorized*?  It does not have to be, but it may
 make things simpler!)
 
-```{r}
+```{r, echo=FALSE}
 
 pluralize_gift(xmas$Gift.Item)
 
@@ -98,14 +107,6 @@ purrr::map_chr(xmas$Gift.Item, pluralize_gift)
 Write a function called `make_phrase` that takes as input the necessary information, 
 and returns a phrase.  For example, 
 
-```{r}
-make_phrase(num = 10, 
-            num_word = "ten", 
-            item = "lords", 
-            verb = "a-leaping", 
-            adjective = "", 
-            location = "")
-```
 
 should return
 
@@ -113,29 +114,37 @@ should return
 "ten lords a-leaping"
 ```
 
-```{r}
+
+
+
+```{r, echo=FALSE}
 make_phrase <- function(num, num_word, item, verb, adjective, location) {
   
   ## Step 1: Replace NAs with blank strings
-  verb <- str_replace_na(verb, "")
+  verb <- str_replace_na(verb, " ")
+  adjective <-str_replace_na(adjective, "")
+  location <- str_replace_na(location, "")
   
   ## Step 2: Pluralize the gift if needed
   ## Items with numbers larger than 1 should be pluralized
   ## Single items starting with a vowel should have "an" in front
   ## All other single items should have "a" in front
   
-  vowel_start <- str_sub(item, 1, 1) %>% str_detect(___)
+  vowel_start <- str_sub(item, 1, 1) %>% 
+    str_detect("[aeiou]")
   
-  if (___) {
+  if (num > 1) {
     
     item <- pluralize_gift(item)
     
-  } else if (vowel_start) {
+  } else if (vowel_start == T) {
+    item <- item %>%
+      paste("an", sep = " ")
   
-      
     
   } else {
-    
+    item <-item %>%
+      paste("a", sep = " ")
     
     
   }
@@ -147,22 +156,39 @@ make_phrase <- function(num, num_word, item, verb, adjective, location) {
 }
 ```
 
+```{r, echo=FALSE}
+make_phrase(num = 10, 
+            num_word = "ten", 
+            item = "lord", 
+            verb = "a-leaping", 
+            adjective = "", 
+            location = "")
+```
+
 
 # Test Your Function
+```{r, echo=FALSE}
+ make_phrase(xmas$Day, xmas$Day.in.Words,xmas$Gift.Item, xmas$Verb, xmas$Adjective, xmas$Location)
+```
+
 
 Try your function out on the `xmas` data, by making a new variable containing
 the daily phrases.
 
 **Hint:** The `Day.in.Words` variable isn't quite what you want! You want `12`
-to say `"twelve"` **not** `"twelfth"`. I suggest using the **english** package
-to create numbered days and then use those in your `pmap_chr()`!
+to say `"twelve"` **not** `"twelfth"`. I suggest using the **english** package to create numbered days and then use those in your `pmap_chr()`!
+ 
+```{r, echo=FALSE}
+twelve_nums <- english(1:12)
+more_nums <- as.character(twelve_nums)
 
-```{r}
-xmas <- xmas %>%
+
+xmas <- xmas %>% 
   mutate(
-    Full.Phrase = pmap_chr(list(___), 
-                           make_phrase)
-  )
+    Full.Phrase = pmap_chr(list(Day, more_nums, Gift.Item, Verb, Adjective, Location), make_phrase))
+
+
+  
 ```
 
 
@@ -179,45 +205,44 @@ Write a function called `sing_line` that takes as input:
 
 * The name of a column in the dataset that contains the phrases for each day.
 
-```{r}
+```{r, echo=FALSE}
 # Produces the string for one day of the song.
 # Arguments -- dataset -- A data frame containing information about gifts
 # Arguments -- line -- The number of the line for the day you want to sing about
 # Arguments -- phrase_col -- The variable name for the column in the dataset that contains the gift phrases
 # Return -- A string singing the line of the song with all gifts for the given day.
 
-sing_day <- function(dataset, line, phrase_col){
+sing_line <- function(dataset, line, phrase_col) {
   
-  # Step 1: Setup the intro line
+  num_word <- english::ordinal(line)
+  line_returned <- glue::glue("On the {num_word} day of Christmas, my true love sent to me")
   
-  num_word <- ____
+  # Sing the gifts
   
-  intro <- glue::glue("On the {num_word} day of Christmas")
+  phrases <- dataset[[phrase_col]]
+  for(i in line:1) {
+    if(i == 1) {
+      if(line > 1) {
+        line_returned <- paste(line_returned, phrases[1], sep = " and ")
+      } else {
+        line_returned <- paste(line_returned, phrases[1], sep = " ")
+      }
+    } else {
+      line_returned <- paste(line_returned, phrases[i], sep = ", ")
+    }
+  }
   
-  # Step 2: Sing the gift phrases
-
-    phrases <- dataset %>% 
-      pull({{phrase_col}})
-
-  ????
-    
-  ## put it together
-    
-  ????
-
-
+  return(line_returned)
+  
 }
-
 
 ```
 
 For example,
-
-
-```{r}
+```{r, echo=FALSE}
 sing_line(xmas, 
-          num = 2, 
-          phrase_col = Full.Phrase)
+          line = 4, 
+          phrase_col = "Full.Phrase")
 
 ```
 
@@ -236,10 +261,10 @@ column names as arguments to a function.  Don't delete that line of code!
 
 ## Step Four: Use Your Functions!
 
-Run the following code to test out your functions! The ouput should be the 
+Run the following code to tet out your functions! The o should be the 
 lyrics for the entire 12 Days of Christmas song. 
 
-```{r}
+```{r, echo=FALSE}
 xmas2 <- xmas %>%
   mutate(
     day.num = as.character(english::english(Day)), 
@@ -252,7 +277,7 @@ xmas2 <- xmas %>%
                            make_phrase)
   )
 
-map_chr(1:12, ~sing_line(xmas2, .x, Full.Phrase)) %>%
+map_chr(1:12, ~sing_line(xmas2, .x, "Full.Phrase")) %>%
   str_c(collapse = "\n") %>%
   cat()
 
